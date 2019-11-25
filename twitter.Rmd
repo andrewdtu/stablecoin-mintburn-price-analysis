@@ -1,0 +1,92 @@
+---
+title: "whale_alert"
+author: "bobthebuilder"
+date: "11/23/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+
+```
+
+```{r viridis-default, include=FALSE}
+## reset color defaults
+## Source https://data-se.netlify.com/2018/12/12/changing-the-default-color-scheme-in-ggplot2/
+library(viridis)
+library(scales)
+ 
+#### continuous variables color and fill
+options(ggplot2.continuous.colour = "viridis")
+options(ggplot2.continuous.fill = "viridis")
+
+#### use viridis for discrete scales
+scale_colour_discrete <- scale_colour_viridis_d
+scale_fill_discrete <- scale_fill_viridis_d
+
+## reset default theme
+##theme_set(theme_minimal())
+```
+
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r wrangle, message=TRUE, warning=TRUE, paged.print=TRUE}
+library(readxl)
+btcusd = btcusd.raw <- read.csv("btcusdcoinbase.csv")%>%
+  select(time, close)%>%
+  mutate(time.date = date(as_datetime(time))) %>%
+  filter(time.date > "2019-06-27")
+twitter.raw <- read_excel("twitter.xlsx")
+as_tibble(twitter.raw)
+
+twitter = twitter.raw %>%
+  transmute(content= Text,time= `Created At`)%>%
+  filter(str_detect(content, "💵|🔥"))%>%
+  mutate(
+        time = str_replace(time,"Mon",""),
+        time = str_replace(time,"Tue",""),
+        time = str_replace(time,"Wed",""),
+        time = str_replace(time,"Thu",""),
+        time = str_replace(time,"Fri",""),
+        time = str_replace(time,"Sat",""),
+        time = str_replace(time,"Sun",""),
+        time = str_replace(time,"\\+0000",""),
+        time = parse_date_time(time, "m d HMS y"),
+        content = str_replace_all(content, "[:punct:]" , "") 
+    ) %>%
+  mutate(money = as.numeric(str_extract(content, "[:digit:]+"))) %>%
+  mutate(boolean = as.logical(str_detect(content, "🔥"))) %>%
+  filter(money < 10000000)%>%
+  mutate(  
+    money = if_else(str_detect(content, "🔥"),
+    money*-1, if_else(str_detect(content, "💵"), money,money))
+    ) %>%
+  mutate(time.date = date(time))
+   #content = str_replace(content, "(?<=\\()[:graph:]",""),
+        #content = str_replace(content, "[:graph:](?=\\))","")
+```
+
+```{r graph}
+twitter1<-left_join(twitter, btcusd, by=c("time.date","time.date"))
+
+ggplot(twitter1, mapping =aes(x=time.date))+
+  geom_col(twitter1, mapping = aes(x= time.date, y=money))+
+  geom_line(mapping = aes( y = 10000*close))
+```
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
